@@ -1,13 +1,18 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "declaration": true
+      "declaration": true,               // Оставляем для генерации типов
+      "moduleResolution": "Node",         // Используем Node-совместимую модель разрешения модулей
+      "esModuleInterop": true,            // Для работы с CommonJS модулями
+      "skipLibCheck": true,               // Пропуск проверки типов в сторонних библиотеках
+      "allowSyntheticDefaultImports": true // Поддержка импортов по умолчанию
     },
     "include": [
-        "src/**/*.ts",
+      "src/**/*.ts"
     ],
     "exclude": [
-        "node_modules/**",
-        "tests/**/*.ts"
+      "node_modules/**",
+      "tests/**/*.ts"
     ]
-}
+  }
+  
