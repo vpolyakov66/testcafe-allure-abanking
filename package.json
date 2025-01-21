@@ -1,6 +1,6 @@
 {
   "name": "testcafe-allure-abanking",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "author": "Vladimir Polyakov",
   "license": "MIT",
   "description": "Custom fork of juanpablo-vasquez/testcafe-reporter-allure-plus, tailored for advanced Allure reporting in TestCafe.",

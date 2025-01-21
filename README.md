@@ -1,181 +1,78 @@
-# testcafe-reporter-allure-plus 
+# testcafe-allure-abanking  
 
-An [Allure](https://allure.qatools.ru/) reporter plugin for [TestCafé](https://devexpress.github.io/testcafe/), based on [Isaac's](https://github.com/isaaceindhoven/testcafe-reporter-allure) modifications.
+Форк [testcafe-reporter-allure-plus](https://github.com/juanpablo-vasquez/testcafe-reporter-allure-plus), основанный на модификациях [Isaac's](https://github.com/isaaceindhoven/testcafe-reporter-allure).  
 
-**Important**: Keep in mind that these modifications are an implementation that suit specifically my use case, required by my client. That's why you will probably see some non-general metatags.
+**Важно**: Эти модификации адаптированы под конкретный кейс и расширяют возможности для работы с Allure в TestCafé.  
 
 
-## TODO
+## Документация  
 
-- [x] Publish package to npm
-- [x] Update config file `allure.config.js` to only have one base URL
-- [x] Add specific metatags `user_story` and `test_case`
-- [x] Generate links for `epic` and `feature` if they are present
-- [x] Generate links for `issue` if present, otherwise use `test_case`
-- [x] Generate links for `story` if present, otherwise use `user_story`
-- [x] Generate links for `bug` if present 
-- [x] Verify is truthy and reliable
-- [x] Research and possibly expand the displayment of errors inside the failed tests - Missing await errors are still ghosting the reporter
-- [ ] Research the posibility of logs as attachments inside steps and tests in general
+Краткая инструкция по началу работы с данным репортером.  
 
-## Documentation
+### Установка  
 
-A brief documentation to get up and running with this reporter
+Установите через npm:  
 
-### Installation
+```sh
+npm install --save-dev testcafe-allure-abanking
+```  
 
-Install with npm:
+### Конфигурация  
 
-````sh
-npm install --save-dev testcafe-reporter-allure-plus
-````
+#### TestCafé  
 
-### Configuration
-
-#### TestCafé
-
-When you run tests from the command-line, specify the reporter name by using the `--reporter` flag:
+Если вы запускаете тесты из командной строки, укажите имя репортера с помощью флага `--reporter`:  
 
 ```console
-testcafe chrome 'path/to/test/file.js' --reporter allure-plus
-```
+testcafe chrome 'path/to/test/file.js' --reporter allure-abanking
+```  
 
-When you use API, pass the reporter name to the `reporter()` method:
+Если вы используете API, передайте имя репортера в метод `reporter()`:  
 
-```js
+```javascript
 testCafe
     .createRunner()
     .src('path/to/test/file.js')
     .browsers('chrome')
-    .reporter('allure-plus') // <-
+    .reporter('allure-abanking') // <-  
     .run();
-```
+```  
 
-When using a general configuration file for TestCafe, use the `reporter` attribute:
+Если вы используете файл конфигурации TestCafe, настройте атрибут `reporter`:  
 
 ```json
 {
     ...
     "reporter": {
-        "name": "allure-plus"
+        "name": "allure-abanking"
     },
     ...
 }
-```
+```  
 
-#### Allure
+#### Allure  
 
-`testcafe-reporter-allure-plus` as its based on @Isaac's changes, provides a default configuration that can be overriden with the use of `allure.config.js` file, in the root of your directory.
-The defaults for this file (`allure.config.js`) are the following:
+`testcafe-allure-abanking` предоставляет файл конфигурации `allure.config.js`, который можно переопределить в корневой директории вашего проекта.  
 
-```js
-module.exports = {
-  REPORTER_CONFIG_FILE: './allure.config.js',
-  CATEGORIES_CONFIG_FILE: './allure-categories.config.js',
+### Шаги  
 
-  RESULT_DIR: './allure/allure-results',
-  REPORT_DIR: './allure/allure-report',
-  SCREENSHOT_DIR: './allure/screenshots',
-
-  CLEAN_RESULT_DIR: true,
-  CLEAN_REPORT_DIR: true,
-  CLEAN_SCREENSHOT_DIR: true,
-
-  ENABLE_SCREENSHOTS: true,
-  ENABLE_QUARANTINE: false,
-  ENABLE_LOGGING: false,
-  CONCURRENCY: 1,
-
-  META: {
-    SEVERITY: 'Normal',
-    PRIORITY: 'Medium',
-    JIRA_URL: 'https://jira.example.nl/browse/',
-  },
-  LABEL: {
-    ISSUE: 'JIRA Test Case',
-    EPIC: 'JIRA Epic',
-    STORY: 'JIRA User Story',
-    FLAKY: 'Flaky test',
-    SCREENSHOT_MANUAL: 'Screenshot taken manually',
-    SCREENSHOT_ON_FAIL: 'Screenshot taken on fail',
-    DEFAULT_STEP_NAME: 'Test Step',
-  },
-};
-```
-
-And, the defaults for `allure-categories.config.js` are the following:
-
-```js
-module.exports = [
-  {
-    name: 'Ignored tests',
-    matchedStatuses: [Status.SKIPPED],
-  },
-  {
-    name: 'Product defects',
-    matchedStatuses: [Status.FAILED],
-    messageRegex: '.*Assertion failed.*',
-  },
-  {
-    name: 'Test defects',
-    matchedStatuses: [Status.FAILED],
-  },
-  {
-    name: 'Warnings',
-    matchedStatuses: [Status.PASSED],
-    messageRegex: '.*Warning.*',
-  },
-  {
-    name: 'Flaky tests',
-    matchedStatuses: [Status.PASSED, Status.FAILED],
-    messageRegex: '.*Flaky.*',
-  },
-];
-```
-
-### Metadata
-
-Metadata can be added to a test using the `meta()` function. The metadata can be added to both `test` and `fixture`
-
-Metadata added to the `fixture` will be inherited by all tests coupled in that fixture to avoid declaring metadata that is the same for all tests within the fixture multiple times.
-
-This is a general example of the metadata added:
+С данным репортером можно определять шаги (`test-steps`), чтобы разделить тест на несколько этапов. Функция шага ожидает три параметра: название шага, `TestController` и действия внутри шага в виде `TestControllerPromise`.  
 
 ```typescript
-test.meta({
-  severity: Severity.TRIVIAL,
-  issue: 'TEST-ISSUE',
-  description: 'An example discription',
-  epic: 'Example Epic Ticket',
-  feature: 'Example Feature Ticket',
-  story: 'Example Story Ticket',
-  suite: 'Main Example Group',
-  // ... any other key: value property as custom metadata
-})('Example test with metadata', async (t) => {
-  // Test Code
-});
-```
+import step from 'testcafe-allure-abanking/dist/utils';
 
-**Important**: Know that `issue`, `epic`, `feature` and `story` can generate links **ONLY** if they have the Jira ID encased in square brackets, for example: `epic: '[EX-00001] Example Epic Ticket'`, will generate a link to `[JIRA_URL]/EX-00001`
-
-### Steps
-
-With this reporter, `test-steps` can be defined to split a `test` into multiple step. The step function expects three values: the step name, the `TestController` and the actions taken within the step as a `TestControllerPromise`.
-
-````typescript
-import step from 'testcafe-reporter-allure-plus/dist/utils';
-
-test("Example test with steps", async t => {
-  await step("Add developer name to form", t, 
-    t.typeText("#developer-name", "Jhon Smith")
+test("Пример теста с шагами", async t => {
+  await step("Добавить имя разработчика в форму", t, 
+    t.typeText("#developer-name", "Иван Иванов")
   );
-  await step("Submit form and check result", t,
+  await step("Отправить форму и проверить результат", t,
     t.click("#submit-button")
       .expect(Selector("#article-header").innerText)
-      .eql("Thank you, John Smith!")
+      .eql("Спасибо, Иван Иванов!")
   );
-})
-````
+});
+```  
 
-## License
-As we are basing our modifications on Isaac's work, our License as of yet would be [MIT](https://github.com/isaaceindhoven/testcafe-reporter-allure/blob/master/LICENSE)
+## Лицензия  
+
+Этот проект распространяется под лицензией [MIT](https://github.com/juanpablo-vasquez/testcafe-reporter-allure-plus/blob/master/LICENSE), так как является форком оригинального репозитория.
