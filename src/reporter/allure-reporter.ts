@@ -21,6 +21,7 @@ import Metadata from './metadata';
 import { ErrorConfig } from './models';
 import { Attachment } from '../testcafe/models';
 import stripAnsi from 'strip-ansi';
+import crypto from 'crypto'
 
 const reporterConfig = loadReporterConfig();
 const categoriesConfig: Category[] = loadCategoriesConfig();
@@ -76,6 +77,10 @@ export default class AllureReporter {
     }
   }
 
+
+  public generateHistoryId(testName: string) {
+    return crypto.createHash('md5').update(testName).digest('hex');
+  }
   public startTest(name: string, meta: object): void {
     const currentGroup = this.group;
     if (currentGroup === null) {
@@ -84,7 +89,7 @@ export default class AllureReporter {
 
     const currentTest = currentGroup.startTest(name);
     currentTest.fullName = `${currentGroup.name} : ${name}`;
-    currentTest.historyId = uuid();
+    currentTest.historyId = this.generateHistoryId(currentGroup.name);
     currentTest.stage = Stage.RUNNING;
 
     this.setCurrentTest(name, currentTest);
@@ -202,7 +207,7 @@ export default class AllureReporter {
       const testStep: TestStep = mergedSteps[i];
       const allureStep: AllureStep = test.startStep(testStep.name);
       if (testStep.attachments.length > 0) {
-        testStep.attachments.forEach(attachment => this.addStepAttachment(allureStep,  attachment));
+        testStep.attachments.forEach(attachment => this.addStepAttachment(allureStep, attachment));
       }
       if (testStep.screenshotAmount && testStep.screenshotAmount > 0) {
         for (let j = 0; j < testStep.screenshotAmount; j += 1) {
