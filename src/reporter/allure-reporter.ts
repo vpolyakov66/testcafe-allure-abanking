@@ -81,19 +81,26 @@ export default class AllureReporter {
   public generateHistoryId(testName: string) {
     return crypto.createHash('md5').update(testName).digest('hex');
   }
+  
   public startTest(name: string, meta: object): void {
     const currentGroup = this.group;
     if (currentGroup === null) {
       throw new Error('No active suite');
     }
 
-    const currentTest = currentGroup.startTest(name);
-    currentTest.fullName = `${currentGroup.name} : ${name}`;
-    currentTest.historyId = this.generateHistoryId(currentGroup.name);
-    currentTest.stage = Stage.RUNNING;
+    // Проверка, существует ли уже тест с таким названием
+    const testId = this.generateHistoryId(name); // Или использовать ID из предыдущих запусков
+    let currentTest = this.getCurrentTest(name);
+    if (!currentTest) {
+      currentTest = currentGroup.startTest(name);
+      currentTest.historyId = testId;
+    }
 
+    currentTest.fullName = `${currentGroup.name} : ${name}`;
+    currentTest.stage = Stage.RUNNING;
     this.setCurrentTest(name, currentTest);
   }
+
 
   public endTest(name: string, testRunInfo: TestRunInfo, meta: object, context: any): void {
     let _this = this;

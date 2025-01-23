@@ -63,6 +63,7 @@ test.meta({
   suite: 'Failing Test Example Group',
 })('Example failing e2e test with steps', async (t) => {
   await step('Add developer name to form', t, t.typeText('#developer-name', 'John Smith'));
+  await step('Добавляем еще один шаг ', t, t.typeText('#developer-name', ' '));
   await step(
     'Submit form and check result',
     t,
