@@ -3,6 +3,8 @@ import { loadReporterConfig } from '../utils/config';
 import * as fs from 'fs';
 import { Attachment } from './models';
 import * as path from 'path';
+import TestController from 'testcafe'; // Импортируем TestController для типизации
+import percySnapshot from '@percy/testcafe'; // Добавляем импорт Percy
 
 const reporterConfig = loadReporterConfig();
 
@@ -23,7 +25,7 @@ export class TestStep {
     if (attachments) {
       if (Array.isArray(attachments))
         this.attachments = attachments;
-      else 
+      else
         this.attachments.push(attachments);
     } else {
       this.attachments = [];
@@ -59,7 +61,7 @@ export class TestStep {
     } catch (e) {
       console.log(e);
     }
-  } 
+  }
 
   public mergeOnSameName(testStep: TestStep): boolean {
     if (this.name === testStep.name) {
@@ -71,9 +73,7 @@ export class TestStep {
     return false;
   }
 
-  // eslint-disable-next-line no-undef
   public addStepToTest(test: TestController): void {
-    // Steps can be added to the metadata of the test for persistance.
     const meta: any = this.getMeta(test);
     if (!meta.steps) {
       meta.steps = [];
@@ -81,7 +81,6 @@ export class TestStep {
     meta.steps.push(this);
   }
 
-  // Using the Testcontroller type might cause an error because of a confict with TestCafé's TestController
   private getMeta(testController: any): any {
     let { meta } = testController.testRun.test;
     if (!meta) {
@@ -92,15 +91,16 @@ export class TestStep {
   }
 }
 
-/* The TestController loses its parameters when returned as a TestControllerPromise. 
-   Therefore the steps cannot be added without a clean TestController.
-*/
-// eslint-disable-next-line no-undef
-export default async function step(name: string, testController: TestController, stepAction: any, attachments?: Attachment[] | Attachment) {
+export default async function step(
+  name: string,
+  testController: TestController,
+  stepAction: any,
+  attachments?: Attachment[] | Attachment
+) {
   let stepPromise = stepAction;
   const testStep = new TestStep(name);
   if (attachments) {
-    if(Array.isArray(attachments))
+    if (Array.isArray(attachments))
       attachments.forEach(attachment => testStep.registerAttachment(attachment));
     else
       testStep.registerAttachment(attachments);
@@ -111,5 +111,8 @@ export default async function step(name: string, testController: TestController,
   }
 
   testStep.addStepToTest(testController);
-  return stepPromise;
+  return stepPromise.then(async (result: any) => {
+    await percySnapshot(testController, name); // Делаем снимок Percy
+    return result; // Возвращаем результат действия
+  });
 }
