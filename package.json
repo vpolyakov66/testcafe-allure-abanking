@@ -30,7 +30,7 @@
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "rollup -c",
-    "test": "npm run test:lint && npm run test:unit && npm run test:e2e",
+    "test": "npm run test:lint:fix && npm run test:unit && npm run test:e2e",
     "test:lint": "eslint --ext .js,.ts --ignore-pattern !.* --ignore-path .gitignore .",
     "test:lint:fix": "eslint --ext .js,.ts --ignore-pattern !.* --ignore-path .gitignore . --fix",
     "test:unit": "jest",
