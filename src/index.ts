@@ -1,17 +1,28 @@
+/* src/index.ts */
 /* eslint-disable @typescript-eslint/no-unused-vars,func-names */
-// Above eslint rules are disabled for development
+
 import { AllureConfig } from 'allure-js-commons';
-import AllureReporter from './reporter/allure-reporter';
+import AllureReporterFactory from './reporter/allure-reporter';
 import { TestRunInfo } from './testcafe/models';
 import cleanAllureFolders from './utils/clean-folders';
 import log from './utils/logger';
+import step, {
+  stepWithExpectedResult
+} from './testcafe/step';
+import {
+  loadReporterConfig
+} from './utils/config';
+import { Severity } from 'allure-js-commons';
+import { Priority } from './reporter/models';
 
+/**
+ * Это ваш плагин-репортер для TestCafe
+ */
 export default function () {
   return {
     allureReporter: null,
     allureConfig: null,
 
-    /* Used to get the reporter for unittesting itself. */
     getReporter() {
       return this;
     },
@@ -20,39 +31,46 @@ export default function () {
       this.allureConfig = allureConfig;
     },
 
-    async reportTaskStart(startTime: Date, userAgents: string[], testCount: number): Promise<void> {
+    async reportTaskStart(startTime: Date, userAgents: string[], testCount: number) {
       log(this, 'Starting Task');
-
-      this.allureReporter = new AllureReporter(this.allureConfig, userAgents);
-      // Clean the previous allure results
+      this.allureReporter = new AllureReporterFactory(this.allureConfig, userAgents);
       await cleanAllureFolders();
     },
 
-    async reportFixtureStart(name: string, path: string, meta: object): Promise<void> {
+    async reportFixtureStart(name: string, path: string, meta: object) {
       log(this, `Starting Fixture: ${name}`);
-
-      // End the previous group because testcafe does not trigger the reporter when a fixture ends.
       this.allureReporter.endGroup();
       this.allureReporter.startGroup(name, meta);
     },
 
-    async reportTestStart(name: string, meta: object): Promise<void> {
+    async reportTestStart(name: string, meta: object) {
       log(this, `Starting Test: ${name}`);
-
       this.allureReporter.startTest(name, meta);
     },
 
-    async reportTestDone(name: string, testRunInfo: TestRunInfo, meta: object): Promise<void> {
+    async reportTestDone(name: string, testRunInfo: TestRunInfo, meta: object) {
       log(this, `Ending Test: ${name}`);
-
       this.allureReporter.endTest(name, testRunInfo, meta, this);
     },
 
-    async reportTaskDone(endTime: Date, passed: number, warnings: string[], result: object): Promise<void> {
+    async reportTaskDone(endTime: Date, passed: number, warnings: string[], result: object) {
       log(this, 'Ending Task');
-
       this.allureReporter.endGroup();
       this.allureReporter.setGlobals();
     },
   };
 }
+
+/**
+ * Всё, что раньше приходилось дергать из подпапок — теперь экспортируется из корня:
+ */
+export {
+  step,
+  stepWithExpectedResult,
+  cleanAllureFolders,
+  log,
+  loadReporterConfig,
+  Severity,
+  Priority,
+  AllureReporterFactory as AllureReporter,
+};
