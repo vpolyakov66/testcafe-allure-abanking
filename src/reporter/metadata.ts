@@ -1,4 +1,5 @@
-/* eslint-disable class-methods-use-this,array-callback-return */
+// reporter/metadata.ts
+
 import { AllureTest, LinkType, Severity } from 'allure-js-commons';
 import { LabelName, Priority } from './models';
 import { TestStep } from '../testcafe/step';
@@ -7,298 +8,200 @@ import { loadReporterConfig } from '../utils/config';
 const reporterConfig = loadReporterConfig();
 
 export default class Metadata {
-  severity: string;
-
-  priority: Priority;
-
-  description: string = "";
-
-  issue: string;
-
-  parent_suite: string;
-
-  suite: string;
-
-  sub_suite: string;
-
-  epic: string;
-
-  story: string;
-
-  bug: string;
-
-  feature: string;
-
+  // стандартные поля
+  severity?: string;
+  priority?: Priority;
+  description: string = '';
+  issue?: string;
+  parent_suite?: string;
+  suite?: string;
+  sub_suite?: string;
+  epic?: string;
+  feature?: string;
+  story?: string;
+  bug?: string;
   flaky: boolean = false;
 
-  steps: TestStep[];
+  // новые кастомные
+  tag?: string;
+  layer?: string;
 
-  user_story: string;
+  // шаги
+  steps?: TestStep[];
 
-  test_case: string;
+  // TMS связи
+  user_story?: string;
+  test_case?: string;
 
-  otherMeta: Map<string, string>;
+  // всё остальное
+  otherMeta: Map<string, string> = new Map();
+  links: string[] = [];
 
-  links: string[];
+  constructor(meta?: any, testContext: boolean = false) {
+    if (!meta) return;
 
-  constructor(meta?: any, test?: boolean) {
-    this.otherMeta = new Map();
-    this.links = [];
-    if (meta) {
-      const { severity, priority, description, issue, suite, epic, story, bug, feature, flaky, steps, user_story, test_case, ...otherMeta } = meta;
+    const {
+      severity,
+      priority,
+      description,
+      issue,
+      suite,
+      epic,
+      story,
+      bug,
+      feature,
+      flaky,
+      steps,
+      user_story,
+      test_case,
+      tag,
+      layer,
+      ...otherMeta
+    } = meta;
 
-      if (this.isValidEnumValue(severity, Severity)) {
-        this.severity = severity;
-      }
-      if (this.isValidEnumValue(priority, Priority)) {
-        this.priority = priority;
-      }
-      if (this.isString(description)) {
-        this.description = description;
-      }
-      if (this.isString(issue)) {
-        this.issue = issue;
-      }
-      if (this.isString(suite)) {
-        if (test) {
-          this.sub_suite = suite;
-        } else {
-          this.parent_suite = suite;
-        }
-      }
-      if (this.isString(epic)) {
-        this.epic = epic;
-      }
-      if (this.isString(story)) {
-        this.story = story;
-      }
-      if (this.isString(bug)) {
-        this.bug = bug;
-      }
-      if (this.isString(feature)) {
-        this.feature = feature;
-      }
-      if (this.isBoolean(flaky)) {
-        this.flaky = flaky;
-      }
-      if (steps) {
-        this.steps = steps;
-      }
-      if (this.isString(user_story)) {
-        this.user_story = user_story;
-      }
-      if (this.isString(test_case)) {
-        this.test_case = test_case;
-      }
-      Object.keys(otherMeta).forEach((key) => {
-        if (this.isString(otherMeta[key])) {
-          this.otherMeta.set(key, otherMeta[key]);
-        }
-      });
+    if (this.isValidEnumValue(severity, Severity)) {
+      this.severity = severity;
     }
-  }
-
-  addMetadataToTest(test: AllureTest, groupMetadata: Metadata) {
-    if (!(groupMetadata instanceof Metadata)) {
-      throw new Error('groupMetadata is not a valid Metadata object');
+    if (this.isValidEnumValue(priority, Priority)) {
+      this.priority = priority;
+    }
+    if (this.isString(description)) {
+      this.description = description;
+    }
+    if (this.isString(issue)) {
+      this.issue = issue;
     }
 
-    // Once metadata has been set it cannot be overritten,
-    // therefore priority metadata has to be loaded added first
-    // The results will list both entries if both added but allure will only take the first.
-    this.mergeMetadata(groupMetadata);
+    if (this.isString(suite)) {
+      if (testContext) this.sub_suite = suite;
+      else this.parent_suite = suite;
+    }
+    if (this.isString(epic)) this.epic = epic;
+    if (this.isString(feature)) this.feature = feature;
+    if (this.isString(story)) this.story = story;
+    if (this.isString(bug)) this.bug = bug;
+    if (this.isBoolean(flaky)) this.flaky = flaky;
 
-    // Labels only accept specific keys/names as valid, it will ignore all other labels
-    // Other variabels have to be added as parameters or links.
-    if (this.severity) {
-      test.addLabel(LabelName.SEVERITY, this.severity);
-    } else {
-      // If no priority is given, set the default priority
-      test.addLabel(LabelName.SEVERITY, reporterConfig.META.SEVERITY);
-    }
+    if (steps) this.steps = steps;
+    if (this.isString(user_story)) this.user_story = user_story;
+    if (this.isString(test_case)) this.test_case = test_case;
 
-    // Only the first priority value is loaded.
-    if (this.priority) {
-      test.addLabel(LabelName.PRIORITY, this.priority);
-    } else {
-      // If no priority is given, set the default priority
-      test.addLabel(LabelName.PRIORITY, reporterConfig.META.PRIORITY);
-    }
+    // кастомные поля
+    if (this.isString(tag)) this.tag = tag;
+    if (this.isString(layer)) this.layer = layer;
 
-    // Tests can be added to multiple suites at the same time.
-    // Suites support 3 different suite levels: Parent, Suite, Sub
-    // A test can have multiple of the same level suites but this will duplicate the test in the report
-    // If a test has 2 parents and 2 suites the result will be that the test is duplicated 4 times for each combination.
-    // Therefore it is advisable to only use suites to categorise them in single fixtures and not for custom configurations.
-    if (this.parent_suite) {
-      test.addLabel(LabelName.PARENT_SUITE, this.parent_suite);
-    }
-    if (this.suite) {
-      test.addLabel(LabelName.SUITE, this.suite);
-    }
-    if (this.sub_suite) {
-      test.addLabel(LabelName.SUB_SUITE, this.sub_suite);
-    }
-
-    // BDD style notation, containing Epics, Features, and Stories can be added to the tests.
-    // These labels work the same way as the suites containing 3 levels. These are in order: Epic -> Feature -> Story
-    if (this.epic) {
-      const _epicID = this.epic.match(/\[(.*?)\]/);
-      test.addLabel(LabelName.EPIC, this.epic);
-      if (_epicID)
-        this.addLink(`${reporterConfig.META.JIRA_URL}${_epicID[1]}`, `${reporterConfig.LABEL.EPIC}: ${_epicID[1]}`, "bolt");
-    }
-    if (this.feature) {
-      test.addLabel(LabelName.FEATURE, this.feature);
-    }
-    if (this.story) {
-      const _usID = this.story.match(/\[(.*?)\]/);
-      test.addLabel(LabelName.STORY, this.story);
-      if (_usID)
-        this.addLink(`${reporterConfig.META.JIRA_URL}${_usID[1]}`, `${reporterConfig.LABEL.STORY}: ${_usID[1]}`, "bookmark");
-    }
-    if (!this.story && this.user_story) {
-      this.addLink(`${reporterConfig.META.JIRA_URL}${this.user_story}`, `${reporterConfig.LABEL.STORY}: ${this.user_story}`, "bookmark");
-    }
-    if (this.bug) {
-      const _bugID = this.bug.match(/\[(.*?)\]/);
-      test.addLabel(LabelName.BUG, this.bug);
-      if (_bugID) {
-        this.addLink(`${reporterConfig.META.JIRA_URL}${_bugID[1]}`, `${reporterConfig.LABEL.BUG}: ${_bugID[1]}`, "bug");
-      }
-    }
-    if (this.issue) {
-      (this.issue.split(",")).forEach((issue) => {
-        this.addLink(
-          `${reporterConfig.META.JIRA_URL}${issue}`,
-          `${reporterConfig.LABEL.ISSUE}: ${issue}`,
-          "check-square",
-        );
-      });
-    }
-
-    if (!this.issue && this.test_case) {
-      this.addLink(
-        `${reporterConfig.META.JIRA_URL}${this.test_case}`,
-        `${reporterConfig.LABEL.ISSUE}: ${this.test_case}`,
-        "check-square",
-      );
-    }
-
-
-    // Flaky is a boolean, only add to test if flaky is true.
-    if (this.flaky) {
-      // TODO: Add flaky correctly to allure instead of as a parameter
-      // However currenly allure-js-commons does not seem to support flaky tests.
-      test.addParameter(reporterConfig.LABEL.FLAKY, this.flaky.toString());
-    }
-
-    if (this.description) {
-      /* eslint-disable-next-line no-param-reassign */
-      let newDescription = this.description ? this.description.split("\n").join("<br/>") + "<br/>" : this.description;
-      newDescription += this.priority ? "<br/><strong>" + LabelName.PRIORITY + "</strong>: " + ((this.priority) ? this.priority : reporterConfig.META.PRIORITY) : "";
-      newDescription += "<h3 class='pane__section-title'>Links</h3>";
-      this.links.forEach(link => {
-        newDescription += link + "<br/>";
-      });
-      test.description = newDescription;
-    }
-
-
-    Array.from(this.otherMeta.entries()).map((entry) => {
-      test.addParameter(entry[0], entry[1]);
+    // всё остальное
+    Object.entries(otherMeta).forEach(([k, v]) => {
+      this.otherMeta.set(k, String(v));
     });
   }
 
-  private mergeMetadata(metadata: Metadata) {
-    // Local metadata takes preference to merged metadata
-    if (!this.severity && metadata.severity) {
-      this.severity = metadata.severity;
-    }
-    if (!this.priority && metadata.priority) {
-      this.priority = metadata.priority;
-    }
-    if (!this.description && metadata.description) {
-      this.description = metadata.description;
-    }
-    if (!this.issue && metadata.issue) {
-      this.issue = metadata.issue;
-    }
-    // Parent_Suite and Suite are used from the merged metadata but Sub_Suite is not.
-    if (!this.parent_suite && metadata.parent_suite) {
-      this.parent_suite = metadata.parent_suite;
-    }
-    if (!this.suite && metadata.suite) {
-      this.suite = metadata.suite;
-    }
-    if (!this.epic && metadata.epic) {
-      this.epic = metadata.epic;
-    }
-    if (!this.story && metadata.story) {
-      this.story = metadata.story;
-    }
-    if (!this.bug && metadata.bug) {
-      this.bug = metadata.bug;
-    }
-    if (!this.feature && metadata.feature) {
-      this.feature = metadata.feature;
-    }
-    if (!this.user_story && metadata.user_story) {
-      this.user_story = metadata.user_story;
-    }
-    if (!this.test_case && metadata.test_case) {
-      this.test_case = metadata.test_case;
-    }
-    if (metadata.flaky) {
-      this.flaky = metadata.flaky;
-    }
-    if (metadata.otherMeta.size > 0) {
-      Array.from(metadata.otherMeta.entries()).map((entry) => {
-        if (!this.otherMeta.has(entry[0])) {
-          this.otherMeta.set(entry[0], entry[1]);
-        }
-      });
-    }
-  }
-
-  public setFlaky() {
-    this.flaky = true;
-  }
-
+  /** Добавить описание (можно вызывать несколько раз) */
   public addDescription(text: string) {
     this.description += text;
   }
 
+  /** Добавить link */
   public addLink(url: string, text: string, icon: string) {
-    this.links.push(`<a class='link' href='${url}' target='_blank'><i class='fa fa-${icon}'></i>${' ' + text}</a>`);
+    this.links.push(
+      `<a class="link" href="${url}" target="_blank"><i class="fa fa-${icon}"></i> ${text}</a>`
+    );
   }
 
+  /** Пометить как flaky */
+  public setFlaky() {
+    this.flaky = true;
+  }
+
+  /** Добавить в otherMeta */
   public addOtherMeta(key: string, value: string) {
     this.otherMeta.set(key, value);
   }
 
+  /** Получить шаги */
   public getSteps(): TestStep[] | null {
-    if (this.steps) {
-      return this.steps;
-    }
-    return null;
+    return this.steps ?? null;
   }
 
-  private isValidEnumValue(value: string, validEnum: { [s: string]: string; }): boolean {
-    if (!value) {
-      return false;
+  /**
+   * Записать всю метадату в AllureTest
+   */
+  public addMetadataToTest(test: AllureTest, groupMeta: Metadata) {
+    // 1) Слить групповую и локальную
+    this.mergeMetadata(groupMeta);
+
+    // 2) Лейблы
+    test.addLabel(LabelName.SEVERITY, this.severity ?? reporterConfig.META.SEVERITY);
+    test.addLabel(LabelName.PRIORITY, this.priority ?? reporterConfig.META.PRIORITY);
+
+    if (this.parent_suite) test.addLabel(LabelName.PARENT_SUITE, this.parent_suite);
+    if (this.suite) test.addLabel(LabelName.SUITE, this.suite);
+    if (this.sub_suite) test.addLabel(LabelName.SUB_SUITE, this.sub_suite);
+
+    if (this.epic) test.addLabel(LabelName.EPIC, this.epic);
+    if (this.feature) test.addLabel(LabelName.FEATURE, this.feature);
+    if (this.story) test.addLabel(LabelName.STORY, this.story);
+    if (this.bug) test.addLabel(LabelName.BUG, this.bug);
+
+    // кастомные лейблы
+    if (this.tag) test.addLabel(LabelName.TAG, this.tag);
+    if (this.layer) test.addLabel(LabelName.LAYER, this.layer);
+
+    // 3) Связи
+    if (this.issue) {
+      this.issue.split(',').forEach(id =>
+        test.addLink(
+          `${reporterConfig.META.JIRA_URL}${id.trim()}`,
+          `${reporterConfig.LABEL.ISSUE}: ${id.trim()}`,
+          'check-square'
+        )
+      );
     }
-    return value.toUpperCase() in validEnum;
+    if (this.test_case) {
+      test.addLink(
+        `${reporterConfig.META.JIRA_URL}${this.test_case}`,
+        `${reporterConfig.LABEL.ISSUE}: ${this.test_case}`,
+        'check-square'
+      );
+    }
+
+    // 4) Описание + ссылки
+    if (this.description) {
+      let desc = this.description.split('\n').join('<br/>');
+      if (this.links.length) {
+        desc += `<h3>Links</h3>${this.links.join('<br/>')}`;
+      }
+      test.description = desc;
+    }
+
+    // 5) Параметры — всё остальное
+    this.otherMeta.forEach((v, k) => {
+      test.addParameter(k, v);
+    });
   }
 
-  private isString(value: any): boolean {
-    if (!value) {
-      return false;
-    }
-    return typeof value === 'string';
+  /** Слить родительский metadata в текущий, если текущего поля нет */
+  private mergeMetadata(parent: Metadata) {
+    if (!this.severity && parent.severity) this.severity = parent.severity;
+    if (!this.priority && parent.priority) this.priority = parent.priority;
+    if (!this.parent_suite && parent.parent_suite) this.parent_suite = parent.parent_suite;
+    if (!this.suite && parent.suite) this.suite = parent.suite;
+    if (!this.sub_suite && parent.sub_suite) this.sub_suite = parent.sub_suite;
+    if (!this.epic && parent.epic) this.epic = parent.epic;
+    if (!this.feature && parent.feature) this.feature = parent.feature;
+    if (!this.story && parent.story) this.story = parent.story;
+    if (!this.bug && parent.bug) this.bug = parent.bug;
+    if (!this.tag && parent.tag) this.tag = parent.tag;
+    if (!this.layer && parent.layer) this.layer = parent.layer;
   }
 
-  private isBoolean(value: any): boolean {
-    return typeof value === 'boolean';
+  private isValidEnumValue(val: any, en: any): boolean {
+    return typeof val === 'string' && Object.values(en).includes(val.toUpperCase());
+  }
+  private isString(val: any): val is string {
+    return typeof val === 'string';
+  }
+  private isBoolean(val: any): val is boolean {
+    return typeof val === 'boolean';
   }
 }

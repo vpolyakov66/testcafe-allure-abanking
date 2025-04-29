@@ -1,40 +1,37 @@
 /* eslint-disable class-methods-use-this,no-param-reassign */
-import { loadReporterConfig } from '../utils/config';
+// testcafe/step.ts
+
 import * as fs from 'fs';
-import { Attachment } from './models';
 import * as path from 'path';
-import TestController from 'testcafe'; // Импортируем TestController для типизации
-import percySnapshot from '@percy/testcafe'; // Добавляем импорт Percy
+import TestController from 'testcafe';
+import percySnapshot from '@percy/testcafe';
+import { loadReporterConfig } from '../utils/config';
+import { Attachment } from './models';
 
 const reporterConfig = loadReporterConfig();
 
 export class TestStep {
-  public screenshotAmount: number;
-
   public name: string;
-
+  public screenshotAmount: number;
   public attachments: Attachment[];
+  public expectedResult?: string; // новое поле
 
-  constructor(name: string, screenshotAmount?: number, attachments?: Attachment | Attachment[]) {
-    if (screenshotAmount) {
-      this.screenshotAmount = screenshotAmount;
-    } else {
-      this.screenshotAmount = 0;
-    }
+  constructor(
+    name: string,
+    screenshotAmount: number = 0,
+    attachments?: Attachment | Attachment[],
+    expectedResult?: string
+  ) {
+    this.name = name || reporterConfig.LABEL.DEFAULT_STEP_NAME;
+    this.screenshotAmount = screenshotAmount;
+    this.attachments = [];
 
     if (attachments) {
-      if (Array.isArray(attachments))
-        this.attachments = attachments;
-      else
-        this.attachments.push(attachments);
-    } else {
-      this.attachments = [];
+      this.attachments = Array.isArray(attachments) ? attachments : [attachments];
     }
 
-    if (name) {
-      this.name = name;
-    } else {
-      this.name = reporterConfig.LABEL.DEFAULT_STEP_NAME;
+    if (expectedResult) {
+      this.expectedResult = expectedResult;
     }
   }
 
@@ -42,42 +39,42 @@ export class TestStep {
     this.screenshotAmount += 1;
   }
 
-  private getDate() {
-    let date = new Date(Date.now());
-    const offset = new Date(date).getTimezoneOffset();
-    date = new Date(date.getTime() + (offset * 60 * 1000));
-    return date.toISOString().split('T')[0];
+  private getDate(): string {
+    const now = new Date();
+    const offset = now.getTimezoneOffset();
+    const local = new Date(now.getTime() + offset * 60000);
+    return local.toISOString().split('T')[0];
   }
 
   public registerAttachment(attachment: Attachment): void {
     try {
-      const filename = `${attachment.name}_${Date.now().toString()}.${attachment.contentType.toLowerCase()}`;
-      const filepath = `${__dirname.split(path.sep).slice(0, -3).join(path.sep) + `${path.sep}allure${path.sep}files`}${path.sep}${this.getDate()}`;
-      if (!fs.existsSync(filepath))
-        fs.mkdirSync(filepath, { recursive: true });
-      fs.writeFileSync(filepath + `${path.sep}${filename}`, attachment.content);
-      attachment.path = filepath + `${path.sep}${filename}`;
+      const filename = `${attachment.name}_${Date.now()}.${attachment.contentType.toLowerCase()}`;
+      const folder = path.join(process.cwd(), reporterConfig.FILE_DIR, this.getDate());
+      if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+      const fullPath = path.join(folder, filename);
+      fs.writeFileSync(fullPath, attachment.content);
+      attachment.path = fullPath;
       this.attachments.push(attachment);
-    } catch (e) {
-      console.log(e);
+    } catch (err) {
+      console.error(err);
     }
   }
 
   public mergeOnSameName(testStep: TestStep): boolean {
     if (this.name === testStep.name) {
-      if (testStep.screenshotAmount) {
-        this.screenshotAmount += testStep.screenshotAmount;
+      this.screenshotAmount += testStep.screenshotAmount;
+      this.attachments.push(...testStep.attachments);
+      if (!this.expectedResult && testStep.expectedResult) {
+        this.expectedResult = testStep.expectedResult;
       }
       return true;
     }
     return false;
   }
 
-  public addStepToTest(test: TestController): void {
-    const meta: any = this.getMeta(test);
-    if (!meta.steps) {
-      meta.steps = [];
-    }
+  public addStepToTest(testController: TestController): void {
+    const meta: any = this.getMeta(testController);
+    if (!meta.steps) meta.steps = [];
     meta.steps.push(this);
   }
 
@@ -91,28 +88,67 @@ export class TestStep {
   }
 }
 
+/**
+ * Обычный шаг
+ */
 export default async function step(
   name: string,
   testController: TestController,
   stepAction: any,
-  attachments?: Attachment[] | Attachment
-) {
-  let stepPromise = stepAction;
+  attachments?: Attachment | Attachment[]
+): Promise<any> {
+  let action = stepAction;
   const testStep = new TestStep(name);
+
   if (attachments) {
-    if (Array.isArray(attachments))
-      attachments.forEach(attachment => testStep.registerAttachment(attachment));
-    else
+    if (Array.isArray(attachments)) {
+      attachments.forEach(att => testStep.registerAttachment(att));
+    } else {
       testStep.registerAttachment(attachments);
+    }
   }
+
   if (reporterConfig.ENABLE_SCREENSHOTS) {
-    stepPromise = stepPromise.takeScreenshot();
+    action = action.takeScreenshot();
     testStep.registerScreenshot();
   }
 
   testStep.addStepToTest(testController);
-  return stepPromise.then(async (result: any) => {
-    await percySnapshot(testController, name); // Делаем снимок Percy
-    return result; // Возвращаем результат действия
-  });
+
+  const result = await action;
+  await percySnapshot(testController, name);  // Percy snapshot
+  return result;
+}
+
+/**
+ * Шаг с ожидаемым результатом
+ */
+export async function stepWithExpectedResult(
+  name: string,
+  expectedResult: string,
+  testController: TestController,
+  stepAction: any,
+  attachments?: Attachment | Attachment[]
+): Promise<any> {
+  let action = stepAction;
+  const testStep = new TestStep(name, 0, attachments, expectedResult);
+
+  if (attachments) {
+    if (Array.isArray(attachments)) {
+      attachments.forEach(att => testStep.registerAttachment(att));
+    } else {
+      testStep.registerAttachment(attachments);
+    }
+  }
+
+  if (reporterConfig.ENABLE_SCREENSHOTS) {
+    action = action.takeScreenshot();
+    testStep.registerScreenshot();
+  }
+
+  testStep.addStepToTest(testController);
+
+  const result = await action;
+  await percySnapshot(testController, name);  // Percy snapshot
+  return result;
 }
